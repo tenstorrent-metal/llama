@@ -55,9 +55,8 @@ class RMSNorm(torch.nn.Module):
         return output * self.weight
 
 
-def apply_scaling(freqs: torch.Tensor):
+def apply_scaling(freqs: torch.Tensor, scale_factor: float = 8):
     # Values obtained from grid search
-    scale_factor = 8
     low_freq_factor = 1
     high_freq_factor = 4
     old_context_len = 8192  # original llama3 length
@@ -78,11 +77,11 @@ def apply_scaling(freqs: torch.Tensor):
     return torch.tensor(new_freqs, dtype=freqs.dtype, device=freqs.device)
 
 
-def precompute_freqs_cis(dim: int, end: int, theta: float = 10000.0, use_scaled: bool = False):
+def precompute_freqs_cis(dim: int, end: int, theta: float = 10000.0, use_scaled: bool = False, scale_factor: float = 8):
     freqs = 1.0 / (theta ** (torch.arange(0, dim, 2)[: (dim // 2)].float() / dim))
     t = torch.arange(end, device=freqs.device, dtype=torch.float32)
     if use_scaled:
-        freqs = apply_scaling(freqs)
+        freqs = apply_scaling(freqs, scale_factor)
     freqs = torch.outer(t, freqs)
     freqs_cis = torch.polar(torch.ones_like(freqs), freqs)  # complex64
     return freqs_cis
@@ -294,6 +293,7 @@ class Transformer(nn.Module):
             params.max_seq_len * 2,
             params.rope_theta,
             params.use_scaled_rope,
+            params.rope_scaling_factor,
         )
 
     @torch.inference_mode()
